@@ -36,6 +36,88 @@ python .\pc_client.py hook <EventName>
 - 收到 `Stop` hook 时主动刷新一次。
 - 周期任务每 60 秒检查一次；只有最近 60 秒内没有主动刷新请求时，才会触发周期刷新。
 
+## Codex hooks 配置
+
+配置文件路径：
+
+```text
+C:\Users\luojiaao\.codex\hooks.json
+```
+
+状态屏 hook 会调用 `pc_client.py hook <EventName>`。建议使用绝对路径，因为 Codex 执行 hook 时的工作目录不一定是本项目目录。
+
+如果你已经有其他 hook，比如写日志的 hook，可以保留；只需要给对应事件追加下面这些状态屏 hook：
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook UserPromptSubmit",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PreToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PostToolUse",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PermissionRequest",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook Stop",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+事件含义：
+
+- `UserPromptSubmit`：提交新请求，屏幕切到 `working`。
+- `PreToolUse`：即将使用工具，屏幕保持 `working`。
+- `PostToolUse`：工具调用结束，屏幕保持 `working`。
+- `PermissionRequest`：等待权限确认，屏幕切到 `waiting`。
+- `Stop`：本轮完成，屏幕切到 `idle`，并触发一次用量刷新。
+
 ## ESP8266 设置
 
 1. 编辑 `esp/config.py`，填写 WiFi 名称和密码。
