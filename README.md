@@ -120,6 +120,12 @@ C:\Users\luojiaao\.codex\hooks.json
 
 ## ESP8266 设置
 
+### 通过 esp-harness 操作开发板
+
+建议安装 [esp-harness](https://github.com/luojiaaoo/esp-harness)，然后通过智能体调用它来完成串口扫描、擦除 flash、刷写 MicroPython 固件、上传 `esp/` 目录代码等操作。
+
+### 上传状态屏程序
+
 1. 编辑 `esp/config.py`，填写 WiFi 名称和密码。
 2. 默认先用 `TFT_DRIVER = "st7789"`。
 3. 如果屏幕黑屏或花屏，把 `TFT_DRIVER` 改成 `"ili9341"` 再试。
