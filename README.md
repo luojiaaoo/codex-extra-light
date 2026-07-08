@@ -44,7 +44,7 @@ python .\pc_client.py hook <EventName>
 C:\Users\luojiaao\.codex\hooks.json
 ```
 
-状态屏 hook 会调用 `pc_client.py hook <EventName>`。建议使用绝对路径，因为 Codex 执行 hook 时的工作目录不一定是本项目目录。
+状态屏 hook 会调用 `pc_client.py <EventName>`。建议使用绝对路径，因为 Codex 执行 hook 时的工作目录不一定是本项目目录。
 
 如果你已经有其他 hook，比如写日志的 hook，可以保留；只需要给对应事件追加下面这些状态屏 hook：
 
@@ -56,7 +56,7 @@ C:\Users\luojiaao\.codex\hooks.json
         "hooks": [
           {
             "type": "command",
-            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook UserPromptSubmit",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" UserPromptSubmit",
             "timeout": 2
           }
         ]
@@ -67,7 +67,7 @@ C:\Users\luojiaao\.codex\hooks.json
         "hooks": [
           {
             "type": "command",
-            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PreToolUse",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" PreToolUse",
             "timeout": 2
           }
         ]
@@ -78,7 +78,7 @@ C:\Users\luojiaao\.codex\hooks.json
         "hooks": [
           {
             "type": "command",
-            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PostToolUse",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" PostToolUse",
             "timeout": 2
           }
         ]
@@ -89,7 +89,7 @@ C:\Users\luojiaao\.codex\hooks.json
         "hooks": [
           {
             "type": "command",
-            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook PermissionRequest",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" PermissionRequest",
             "timeout": 2
           }
         ]
@@ -100,7 +100,7 @@ C:\Users\luojiaao\.codex\hooks.json
         "hooks": [
           {
             "type": "command",
-            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" hook Stop",
+            "command": "python \"D:/我的开源/codex-extra-light/pc_client.py\" Stop",
             "timeout": 2
           }
         ]
