@@ -1,5 +1,5 @@
-WIFI_SSID = "YOUR_WIFI_SSID"
-WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
+WIFI_SSID = "titan3"
+WIFI_PASSWORD = "luojiaao1"
 
 LISTEN_PORT = 8765
 
@@ -10,6 +10,9 @@ PIN_MOSI = 13
 PIN_CS = 15
 PIN_DC = 4
 PIN_RST = 5
+
+# LED 引脚（NodeMCU 板载 LED 通常在 GPIO2 / D4）
+LED_PIN = 2
 
 # 默认先用 "st7789"。如果屏幕黑屏或花屏，再尝试 "ili9341"。
 TFT_DRIVER = "st7789"

@@ -4,6 +4,7 @@ import time
 import network
 import uasyncio as asyncio
 import ujson as json
+from machine import Pin
 
 import config
 from tft_display import TFT
@@ -114,6 +115,8 @@ class CodexScreen:
 
 
 async def connect_wifi():
+    led = Pin(config.LED_PIN, Pin.OUT)
+    led.value(1)  # 先熄灭
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
@@ -121,8 +124,11 @@ async def connect_wifi():
         start = time.time()
         while not wlan.isconnected():
             if time.time() - start > 30:
+                led.value(1)  # 超时熄灭
                 raise RuntimeError("WiFi connect timeout")
+            led.value(not led.value())  # 切换LED状态
             await asyncio.sleep_ms(250)
+    led.value(0)  # 连接成功点亮
     print("WiFi:", wlan.ifconfig())
     return wlan
 
