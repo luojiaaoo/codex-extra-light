@@ -13,6 +13,7 @@ class TFT:
         self.height = config.TFT_HEIGHT
         self.driver = config.TFT_DRIVER
         self.rotation = config.TFT_ROTATION
+        self.mirror_x = getattr(config, "TFT_MIRROR_X", False)
         self.spi = SPI(
             1,
             baudrate=26000000,
@@ -28,10 +29,7 @@ class TFT:
 
     def init(self):
         self.reset()
-        if self.driver == "ili9341":
-            self.init_ili9341()
-        else:
-            self.init_st7789()
+        self.init_ili9341()
 
     def reset(self):
         self.rst(1)
@@ -50,18 +48,6 @@ class TFT:
             self.spi.write(data)
         self.cs(1)
 
-    def init_st7789(self):
-        self.command(0x01)
-        time.sleep_ms(150)
-        self.command(0x11)
-        time.sleep_ms(120)
-        self.command(0x3A, b"\x55")
-        self.command(0x36, self.madctl())
-        self.command(0x21)
-        self.command(0x13)
-        self.command(0x29)
-        time.sleep_ms(50)
-
     def init_ili9341(self):
         self.command(0x01)
         time.sleep_ms(150)
@@ -75,7 +61,10 @@ class TFT:
 
     def madctl(self):
         values = [0x00, 0x60, 0xC0, 0xA0]
-        return bytes([values[self.rotation % 4]])
+        value = values[self.rotation % 4]
+        if self.mirror_x:
+            value ^= 0x40
+        return bytes([value])
 
     def set_window(self, x0, y0, x1, y1):
         self.command(
@@ -134,6 +123,5 @@ class TFT:
         fb.text(text, 0, 0, 1)
         for yy in range(height):
             for xx in range(width):
-                index = yy * width + xx
-                if buf[index >> 3] & (1 << (index & 7)):
+                if fb.pixel(xx, yy):
                     self.fill_rect(x + xx * scale, y + yy * scale, scale, scale, color)

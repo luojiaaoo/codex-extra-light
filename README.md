@@ -127,10 +127,9 @@ C:\Users\luojiaao\.codex\hooks.json
 ### 上传状态屏程序
 
 1. 编辑 `esp/config.py`，填写 WiFi 名称和密码。
-2. 默认先用 `TFT_DRIVER = "st7789"`。
-3. 如果屏幕黑屏或花屏，把 `TFT_DRIVER` 改成 `"ili9341"` 再试。
-4. 把 `esp/config.py`、`esp/tft_display.py`、`esp/main.py` 上传到 ESP8266。
-5. 重启 ESP，从串口输出读取 IP 地址。
+2. `TFT_DRIVER = "ili9341"`。
+3. 把 `esp/config.py`、`esp/tft_display.py`、`esp/main.py` 上传到 ESP8266。
+4. 重启 ESP，从串口输出读取 IP 地址。
 
 默认 NodeMCU 接线见 `esp/README.md`。
 

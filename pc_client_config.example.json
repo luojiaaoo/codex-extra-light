@@ -1,7 +1,4 @@
 {
   "esp_host": "192.168.1.50",
-  "esp_port": 8765,
-  "listen_host": "127.0.0.1",
-  "listen_port": 8766,
-  "usage_refresh_seconds": 60
+  "esp_port": 8765
 }

@@ -15,6 +15,18 @@ STATE_WAITING = "waiting"
 STATE_WORKING = "working"
 
 
+def led_on(led):
+    led.value(0 if getattr(config, "LED_ACTIVE_LOW", True) else 1)
+
+
+def led_off(led):
+    led.value(1 if getattr(config, "LED_ACTIVE_LOW", True) else 0)
+
+
+def led_toggle(led):
+    led.value(0 if led.value() else 1)
+
+
 class CodexScreen:
     def __init__(self):
         self.tft = TFT(config)
@@ -28,6 +40,17 @@ class CodexScreen:
         }
         self.blink_on = False
         self.draw_all()
+
+    def show_message(self, message):
+        self.usage = {
+            "plan_type": None,
+            "five_hour_percent": None,
+            "week_percent": None,
+            "updated_at": None,
+            "error": message,
+        }
+        self.draw_usage()
+        self.draw_status()
 
     def draw_all(self):
         self.tft.fill(config.BACKGROUND)
@@ -114,23 +137,72 @@ class CodexScreen:
         gc.collect()
 
 
-async def connect_wifi():
+async def connect_wifi(screen=None):
     led = Pin(config.LED_PIN, Pin.OUT)
-    led.value(1)  # 先熄灭
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    if not wlan.isconnected():
+
+    while not wlan.isconnected():
+        led_off(led)
+        if screen:
+            screen.show_message("connecting wifi")
+        try:
+            wlan.disconnect()
+        except Exception:
+            pass
+        await asyncio.sleep_ms(200)
+
         wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
         start = time.time()
-        while not wlan.isconnected():
-            if time.time() - start > 30:
-                led.value(1)  # 超时熄灭
-                raise RuntimeError("WiFi connect timeout")
-            led.value(not led.value())  # 切换LED状态
-            await asyncio.sleep_ms(250)
-    led.value(0)  # 连接成功点亮
+        while not wlan.isconnected() and time.time() - start <= 20:
+            led_toggle(led)
+            await asyncio.sleep_ms(120)
+
+        if not wlan.isconnected():
+            led_off(led)
+            if screen:
+                screen.show_message("wifi retry")
+            await asyncio.sleep(2)
+
+    led_on(led)
     print("WiFi:", wlan.ifconfig())
-    return wlan
+    if screen:
+        screen.show_message("waiting for PC client")
+    return wlan, led
+
+
+async def wifi_watch_loop(wlan, led, screen):
+    while True:
+        if wlan.isconnected():
+            led_on(led)
+            await asyncio.sleep(2)
+            continue
+
+        print("WiFi disconnected")
+        if screen:
+            screen.show_message("wifi reconnect")
+
+        while not wlan.isconnected():
+            try:
+                wlan.disconnect()
+            except Exception:
+                pass
+            await asyncio.sleep_ms(200)
+            wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
+
+            start = time.time()
+            while not wlan.isconnected() and time.time() - start <= 15:
+                led_toggle(led)
+                await asyncio.sleep_ms(120)
+
+            if not wlan.isconnected():
+                led_off(led)
+                await asyncio.sleep(2)
+
+        led_on(led)
+        print("WiFi reconnected:", wlan.ifconfig())
+        if screen:
+            screen.show_message("waiting for PC client")
 
 
 async def handle_client(reader, writer, screen):
@@ -154,9 +226,10 @@ async def handle_client(reader, writer, screen):
 
 
 async def main():
-    await connect_wifi()
     screen = CodexScreen()
+    wlan, led = await connect_wifi(screen)
     asyncio.create_task(screen.blink_loop())
+    asyncio.create_task(wifi_watch_loop(wlan, led, screen))
     await asyncio.start_server(
         lambda reader, writer: handle_client(reader, writer, screen),
         "0.0.0.0",
