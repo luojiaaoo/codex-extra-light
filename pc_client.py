@@ -13,7 +13,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 import codex_usage
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "pc_client_config.json"
 
 State = Literal["working", "waiting", "idle"]
@@ -271,16 +271,16 @@ class DesktopApp:
                 if snapshot is None:
                     self.log("Skipped — fetch failed after retry")
                 else:
-                    self.log(f"Sending: {json.dumps(snapshot, ensure_ascii=False)}")
-                    try:
-                        asyncio.run(send_snapshot(snapshot, self.config))
-                        usage = snapshot.get("usage", {})
-                        if usage.get("error"):
-                            self.log(f"Usage error: {usage['error']}")
-                        else:
+                    usage = snapshot.get("usage", {})
+                    if usage.get("error"):
+                        self.log(f"Usage error: {usage['error']}")
+                    else:
+                        self.log(f"Sending: {json.dumps(snapshot, ensure_ascii=False)}")
+                        try:
+                            asyncio.run(send_snapshot(snapshot, self.config))
                             self.log(f"Sent OK → {self.format_usage(usage)}")
-                    except Exception as exc:
-                        self.log(f"Send failed: {exc}")
+                        except Exception as exc:
+                            self.log(f"Send failed: {exc}")
 
                 seconds = self.config.poll_seconds
                 for _ in range(seconds):
