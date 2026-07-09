@@ -15,9 +15,9 @@ flowchart LR
     subgraph ESP["ESP8266 NodeMCU"]
         D1["D1 / GPIO5"]
         D2["D2 / GPIO4"]
+        D3["D3 / GPIO0"]
         D5["D5 / GPIO14"]
         D7["D7 / GPIO13"]
-        D8["D8 / GPIO15"]
         P33["3V3"]
         G["GND"]
     end
@@ -34,16 +34,16 @@ flowchart LR
 
     D1 --> RST
     D2 --> DC
+    D3 --> CS
     D5 --> SCK
     D7 --> SDA
-    D8 --> CS
     P33 --> VCC
     G --> GND
 ```
 
 - TFT `SCK` -> `D5 / GPIO14`
 - TFT `SDA` -> `D7 / GPIO13`
-- TFT `CS` -> `D8 / GPIO15`
+- TFT `CS` -> `D3 / GPIO0`
 - TFT `DC` -> `D2 / GPIO4`
 - TFT `RST` -> `D1 / GPIO5`
 - TFT `VCC` -> `3V3`
