@@ -1,4 +1,5 @@
 import gc
+import machine
 import time
 
 import network
@@ -14,153 +15,138 @@ STATE_WAITING = "waiting"
 STATE_WORKING = "working"
 
 
-class CodexScreen:
+class SetupScreen:
     def __init__(self):
         self.tft = TFT(config)
-        self.state = STATE_IDLE
-        self.ip_address = None
-        self.usage = {
-            "plan_type": None,
-            "five_hour_percent": None,
-            "week_percent": None,
-            "updated_at": None,
-            "error": "waiting for PC client",
-        }
-        self.blink_on = False
-        self.draw_all()
+        self.setup_ssid = None
+        self.setup_password = None
+        self.setup_ip = None
+        self.setup_mode = "starting"
+        self.setup_message = "starting network"
+        self.setup_remaining = None
+        self.draw_setup()
 
     def show_message(self, message):
-        self.usage = {
-            "plan_type": None,
-            "five_hour_percent": None,
-            "week_percent": None,
-            "updated_at": None,
-            "error": message,
-        }
-        self.draw_usage()
-        self.draw_status()
+        self.setup_message = message
+        self.draw_setup()
 
     def set_ip(self, ip_address):
-        self.ip_address = ip_address
-        self.draw_usage()
+        self.setup_ip = ip_address
+        self.draw_setup()
 
-    def draw_all(self):
+    def show_setup_ap(self, ssid, password, ip_address, message):
+        self.setup_mode = "hotspot"
+        self.setup_ssid = ssid
+        self.setup_password = password or "open"
+        self.setup_ip = ip_address
+        self.setup_message = message
+        self.setup_remaining = None
+        self.draw_setup()
+
+    def show_wifi_connecting(self, ssid, remaining=None):
+        partial = self.setup_mode == "connecting" and self.setup_ssid == ssid
+        self.setup_mode = "connecting"
+        self.setup_ssid = ssid
+        self.setup_password = None
+        self.setup_ip = None
+        self.setup_message = "WIFI Connecting"
+        self.setup_remaining = remaining
+        if partial:
+            self.draw_countdown()
+        else:
+            self.draw_setup()
+
+    def draw_setup(self):
         self.tft.fill(config.BACKGROUND)
-        self.draw_usage()
-        self.draw_status()
-
-    def draw_ip(self):
-        if self.ip_address:
-            text = "IP " + self.ip_address + ":" + str(config.LISTEN_PORT)
+        self.tft.text("WIFI SETUP", 8, 10, config.TEXT, config.BACKGROUND, 2)
+        self.tft.text(str(self.setup_message)[:27], 8, 44, config.BRIGHT_YELLOW, config.BACKGROUND, 1)
+        if self.setup_mode == "hotspot" and self.setup_ssid:
+            self.tft.text("HOTSPOT ON", 8, 72, config.BRIGHT_GREEN, config.BACKGROUND, 2)
+            self.tft.text("SSID:", 8, 112, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text(str(self.setup_ssid)[:25], 8, 130, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text("PASS:", 8, 154, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text(str(self.setup_password)[:25], 8, 172, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text("URL: http://" + str(self.setup_ip or "192.168.4.1"), 8, 202, config.TEXT, config.BACKGROUND, 1)
+        elif self.setup_mode == "connecting" and self.setup_ssid:
+            self.tft.text("SSID:", 8, 92, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text(str(self.setup_ssid)[:25], 8, 112, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text("WIFI Connecting", 8, 150, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
+            self.draw_countdown()
         else:
-            text = "IP connecting"
-        self.tft.text(text[:29], 8, 184, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text("CONNECTING WIFI", 8, 96, config.TEXT, config.BACKGROUND, 2)
+        self.tft.fill_rect(0, 250, config.TFT_WIDTH, config.TFT_HEIGHT - 250, config.BRIGHT_YELLOW)
+        self.tft.text("SETUP MODE", 8, 282, config.TEXT, None, 2)
 
-    def draw_usage(self):
-        self.tft.fill_rect(0, 0, config.TFT_WIDTH, 198, config.BACKGROUND)
-        self.tft.text("CODEX", 8, 10, config.TEXT, config.BACKGROUND, 3)
-        if self.usage.get("error"):
-            self.tft.text("usage error", 8, 52, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
-            self.tft.text(str(self.usage.get("error"))[:25], 8, 78, config.TEXT, config.BACKGROUND, 1)
-            self.draw_ip()
-            return
-
-        plan = self.usage.get("plan_type") or "unknown"
-        five = self.percent_text(self.usage.get("five_hour_percent"))
-        week = self.percent_text(self.usage.get("week_percent"))
-        updated = self.short_time(self.usage.get("updated_at"))
-
-        self.tft.text("PLAN " + str(plan)[:12], 8, 52, config.TEXT, config.BACKGROUND, 2)
-        self.tft.text("5H   " + five, 8, 84, config.TEXT, config.BACKGROUND, 3)
-        self.tft.text("WEEK " + week, 8, 122, config.TEXT, config.BACKGROUND, 3)
-        self.tft.text("UPD " + updated, 8, 166, config.TEXT, config.BACKGROUND, 1)
-        self.draw_ip()
-
-    def percent_text(self, value):
-        if value is None:
-            return "n/a"
-        return str(value) + "%"
-
-    def short_time(self, value):
-        if not value:
-            return "n/a"
-        if "T" in value:
-            return value.split("T", 1)[1][:5]
-        return str(value)[:16]
-
-    def draw_status(self):
-        top = 200
-        height = config.TFT_HEIGHT - top
-        width = config.TFT_WIDTH
-
-        if self.state == STATE_WORKING:
-            color = config.BRIGHT_RED if self.blink_on else config.DIM_RED
-            label = "WORKING"
-        elif self.state == STATE_WAITING:
-            color = config.BRIGHT_YELLOW
-            label = "WAITING"
+    def draw_countdown(self):
+        if self.setup_remaining is None:
+            text = "LEFT: 30 sec"
         else:
-            color = config.BRIGHT_GREEN
-            label = "IDLE"
-
-        self.tft.fill_rect(0, top, width, height, color)
-        self.tft.text(label, 8, top + 48, config.TEXT, None, 2)
-
-    async def blink_loop(self):
-        while True:
-            if self.state == STATE_WORKING:
-                self.blink_on = not self.blink_on
-                self.draw_status()
-                await asyncio.sleep_ms(450)
-            else:
-                if self.blink_on:
-                    self.blink_on = False
-                    self.draw_status()
-                await asyncio.sleep_ms(150)
-
-    def update_snapshot(self, snapshot):
-        state = snapshot.get("state")
-        if state in (STATE_WORKING, STATE_WAITING, STATE_IDLE):
-            self.state = state
-        usage = snapshot.get("usage")
-        if isinstance(usage, dict):
-            self.usage = usage
-        if self.state != STATE_WORKING:
-            self.blink_on = False
-        self.draw_usage()
-        self.draw_status()
-        gc.collect()
+            text = "LEFT: " + str(self.setup_remaining) + " sec"
+        self.tft.fill_rect(8, 188, 190, 20, config.BACKGROUND)
+        self.tft.text(text, 8, 188, config.TEXT, config.BACKGROUND, 2)
 
 
 async def connect_wifi(screen=None):
     wlan = network.WLAN(network.STA_IF)
+    stop_setup_ap()
     wlan.active(True)
+    try:
+        wlan.disconnect()
+    except Exception:
+        pass
+    await asyncio.sleep_ms(300)
 
-    while not wlan.isconnected():
-        if screen:
-            screen.show_message("connecting wifi")
-        try:
-            wlan.disconnect()
-        except Exception:
-            pass
-        await asyncio.sleep_ms(200)
+    while True:
+        creds = load_wifi_credentials()
+        if not creds:
+            await start_setup_portal(wlan, screen, "no wifi config")
 
-        wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
-        start = time.time()
-        while not wlan.isconnected() and time.time() - start <= 20:
-            await asyncio.sleep_ms(120)
-
-        if not wlan.isconnected():
-            if screen:
-                screen.show_message("wifi retry")
-            await asyncio.sleep(2)
+        if await try_wifi_once(wlan, creds, screen):
+            break
+        await start_setup_portal(wlan, screen, "wifi setup needed")
 
     ifconfig = wlan.ifconfig()
     print("WiFi:", ifconfig)
+    stop_setup_ap()
     if screen:
         screen.set_ip(ifconfig[0])
         screen.show_message("waiting for PC client")
     return wlan
+
+
+async def try_wifi_once(wlan, creds, screen=None):
+    timeout = getattr(config, "WIFI_CONNECT_TIMEOUT", 30)
+    ssid = creds["ssid"]
+    if screen and hasattr(screen, "show_wifi_connecting"):
+        screen.show_wifi_connecting(ssid, timeout)
+    elif screen:
+        screen.show_message("WIFI Connecting")
+
+    try:
+        wlan.disconnect()
+    except Exception:
+        pass
+    stop_setup_ap()
+    await asyncio.sleep_ms(200)
+
+    print("WiFi connecting:", ssid)
+    wlan.connect(ssid, creds.get("password", ""))
+    start = time.time()
+    last_remaining = timeout
+    while not wlan.isconnected() and time.time() - start <= timeout:
+        remaining = timeout - int(time.time() - start)
+        if remaining != last_remaining:
+            last_remaining = remaining
+            if screen and hasattr(screen, "show_wifi_connecting"):
+                screen.show_wifi_connecting(ssid, max(remaining, 0))
+        await asyncio.sleep_ms(120)
+    if wlan.isconnected():
+        return True
+
+    print("WiFi connect timeout:", ssid)
+    if screen:
+        screen.show_message("wifi connect failed")
+    return False
 
 
 async def wifi_watch_loop(wlan, screen):
@@ -170,29 +156,40 @@ async def wifi_watch_loop(wlan, screen):
             continue
 
         print("WiFi disconnected")
-        if screen:
-            screen.show_message("wifi reconnect")
+        machine.reset()
 
-        while not wlan.isconnected():
-            try:
-                wlan.disconnect()
-            except Exception:
-                pass
-            await asyncio.sleep_ms(200)
-            wlan.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
 
-            start = time.time()
-            while not wlan.isconnected() and time.time() - start <= 15:
-                await asyncio.sleep_ms(120)
+def load_wifi_credentials():
+    try:
+        with open(getattr(config, "WIFI_CONFIG_PATH", "wifi_config.json"), "r") as handle:
+            creds = json.loads(handle.read())
+    except Exception:
+        return None
 
-            if not wlan.isconnected():
-                await asyncio.sleep(2)
+    if not isinstance(creds, dict):
+        return None
+    ssid = str(creds.get("ssid", "")).strip()
+    if not ssid:
+        return None
+    return {
+        "ssid": ssid,
+        "password": str(creds.get("password", "")),
+    }
 
-        ifconfig = wlan.ifconfig()
-        print("WiFi reconnected:", ifconfig)
-        if screen:
-            screen.set_ip(ifconfig[0])
-            screen.show_message("waiting for PC client")
+
+def stop_setup_ap():
+    try:
+        ap = network.WLAN(network.AP_IF)
+        if ap.active():
+            ap.active(False)
+    except Exception:
+        pass
+
+
+async def start_setup_portal(wlan, screen, message):
+    import wifi_setup
+
+    await wifi_setup.run(wlan, screen, message)
 
 
 async def handle_client(reader, writer, screen):
@@ -216,8 +213,15 @@ async def handle_client(reader, writer, screen):
 
 
 async def main():
+    setup_screen = SetupScreen()
+    wlan = await connect_wifi(setup_screen)
+    del setup_screen
+    gc.collect()
+
+    from codex_screen import CodexScreen
+
     screen = CodexScreen()
-    wlan = await connect_wifi(screen)
+    screen.set_ip(wlan.ifconfig()[0])
     asyncio.create_task(screen.blink_loop())
     asyncio.create_task(wifi_watch_loop(wlan, screen))
     await asyncio.start_server(

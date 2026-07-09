@@ -126,10 +126,10 @@ C:\Users\luojiaao\.codex\hooks.json
 
 ### 上传状态屏程序
 
-1. 编辑 `esp/config.py`，填写 WiFi 名称和密码。
-2. `TFT_DRIVER = "ili9341"`。
-3. 把 `esp/config.py`、`esp/tft_display.py`、`esp/main.py` 上传到 ESP8266。
-4. 重启 ESP，从串口输出读取 IP 地址。
+1. 编辑 `esp/config.py`，按屏幕型号设置 `TFT_DRIVER`，必要时修改 `SETUP_AP_PASSWORD`。
+2. 把 `esp/config.py`、`esp/tft_display.py`、`esp/wifi_setup.py`、`esp/codex_screen.py`、`esp/main.py` 上传到 ESP8266。
+3. 重启 ESP；首次启动或 WiFi 连接失败时，连接 `Codex-Setup-xxxxxx` 热点，系统通常会自动弹出配网页面；如果没有弹出，手动打开 `http://192.168.4.1/`，然后从下拉框选择 WiFi 或点击刷新重新扫描。
+4. 保存后 ESP 自动重启并尝试连接目标 WiFi；从屏幕或串口输出读取 IP 地址。
 
 默认 NodeMCU 接线见 `esp/README.md`。
 

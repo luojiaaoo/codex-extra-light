@@ -1,5 +1,8 @@
-WIFI_SSID = "titan3"
-WIFI_PASSWORD = "luojiaao1"
+WIFI_CONFIG_PATH = "wifi_config.json"
+WIFI_CONNECT_TIMEOUT = 30
+
+SETUP_AP_SSID_PREFIX = "Codex-Setup"
+SETUP_AP_PASSWORD = "codex8266"
 
 LISTEN_PORT = 8765
 
