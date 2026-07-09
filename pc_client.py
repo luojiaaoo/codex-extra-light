@@ -10,6 +10,9 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Any, Literal, NotRequired, TypedDict
 
+import pystray
+from PIL import Image
+
 import codex_usage
 
 
@@ -174,9 +177,15 @@ class DesktopApp:
 
         self.switch_text = tk.StringVar(value="▶ Start")
         self.endpoint_text = tk.StringVar(value=self.config.esp_endpoint)
+        self._tray_started = False
+        self._use_tray = sys.platform == "win32"
 
         self.build_ui()
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        if self._use_tray:
+            self._create_tray()
+            self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
+        else:
+            self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def build_ui(self) -> None:
         row = ttk.Frame(self.root, padding=(12, 8))
@@ -370,6 +379,32 @@ class DesktopApp:
 
         tk.Button(buttons, text="保存", width=3, command=save).pack(side="left")
         tk.Button(buttons, text="取消", width=3, command=dialog.destroy).pack(side="left", padx=(8, 0))
+
+    # ── system tray ──────────────────────────────────────────────
+    def _create_tray(self) -> None:
+        image = Image.open(_icon_path())
+        menu = pystray.Menu(
+            pystray.MenuItem("Show", self.restore_window, default=True),
+            pystray.MenuItem("Quit", self.quit_app),
+        )
+        self.tray_icon = pystray.Icon("CodexExtraLight", image, "CodexExtraLight", menu)
+
+    def hide_to_tray(self) -> None:
+        self.root.withdraw()
+        if not self._tray_started:
+            threading.Thread(target=self.tray_icon.run, daemon=True).start()
+            self._tray_started = True
+
+    def restore_window(self, icon: Any = None, item: Any = None) -> None:
+        self.root.deiconify()
+        self.root.lift()
+
+    def quit_app(self, icon: Any = None, item: Any = None) -> None:
+        self.polling = False
+        self.stop_event.set()
+        self.tray_icon.stop()
+        self.root.destroy()
+    # ──────────────────────────────────────────────────────────────
 
     def on_close(self) -> None:
         self.polling = False
