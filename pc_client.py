@@ -228,17 +228,28 @@ class DesktopApp:
         try:
             while self.polling and not self.stop_event.is_set():
                 self.log("Fetching Codex usage…")
-                try:
-                    snapshot = asyncio.run(build_usage_snapshot())
+                snapshot = None
+                for attempt in (1, 2):
+                    try:
+                        snapshot = asyncio.run(build_usage_snapshot())
+                        break
+                    except Exception as exc:
+                        self.log(f"Attempt {attempt} failed: {exc}")
+                        if attempt == 1:
+                            self.log("Retrying…")
+                if snapshot is None:
+                    self.log("Skipped — fetch failed after retry")
+                else:
                     self.log(f"Sending: {json.dumps(snapshot, ensure_ascii=False)}")
-                    asyncio.run(send_snapshot(snapshot, self.config))
-                    usage = snapshot.get("usage", {})
-                    if usage.get("error"):
-                        self.log(f"Usage error: {usage['error']}")
-                    else:
-                        self.log(f"Sent OK → {self.format_usage(usage)}")
-                except Exception as exc:
-                    self.log(f"Send failed: {exc}")
+                    try:
+                        asyncio.run(send_snapshot(snapshot, self.config))
+                        usage = snapshot.get("usage", {})
+                        if usage.get("error"):
+                            self.log(f"Usage error: {usage['error']}")
+                        else:
+                            self.log(f"Sent OK → {self.format_usage(usage)}")
+                    except Exception as exc:
+                        self.log(f"Send failed: {exc}")
 
                 seconds = self.config.poll_seconds
                 for _ in range(seconds):
