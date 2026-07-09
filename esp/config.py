@@ -11,9 +11,6 @@ PIN_CS = 0
 PIN_DC = 4
 PIN_RST = 5
 
-# LED 引脚（NodeMCU 板载 LED 通常在 GPIO2 / D4）
-LED_PIN = 2
-LED_ACTIVE_LOW = True
 
 # 默认 "ili9341"。
 TFT_DRIVER = "ili9341"

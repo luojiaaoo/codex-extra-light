@@ -23,13 +23,13 @@ flowchart LR
     end
 
     subgraph TFT["2.4 寸 SPI TFT 屏幕"]
-        RST["RST"]
-        DC["DC"]
+        GND["GND"]
+        VCC["VCC"]
         SCK["SCK"]
         SDA["SDA / MOSI"]
+        RST["RST"]
+        DC["DC"]
         CS["CS"]
-        VCC["VCC"]
-        GND["GND"]
     end
 
     D1 --> RST
@@ -41,13 +41,13 @@ flowchart LR
     G --> GND
 ```
 
+- TFT `GND` -> `GND`
+- TFT `VCC` -> `3V3`
 - TFT `SCK` -> `D5 / GPIO14`
 - TFT `SDA` -> `D7 / GPIO13`
-- TFT `CS` -> `D3 / GPIO0`
-- TFT `DC` -> `D2 / GPIO4`
 - TFT `RST` -> `D1 / GPIO5`
-- TFT `VCC` -> `3V3`
-- TFT `GND` -> `GND`
+- TFT `DC` -> `D2 / GPIO4`
+- TFT `CS` -> `D3 / GPIO0`
 
 接线方向按“屏幕引脚接到 NodeMCU 引脚”理解。`SDA` 是屏幕 SPI 数据输入，等价于 `MOSI`；这个屏幕没有接 `MISO`。
 

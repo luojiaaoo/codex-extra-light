@@ -13,7 +13,6 @@ import codex_usage
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "pc_client_config.json"
 CONFIG_EXAMPLE_PATH = ROOT / "pc_client_config.example.json"
-STATE_PATH = ROOT / ".pc_client_state.json"
 
 State = Literal["working", "waiting", "idle"]
 
@@ -85,42 +84,11 @@ def coerce_config(raw: dict[str, Any]) -> ClientConfig:
     )
 
 
-def load_cached_usage() -> codex_usage.UsageDisplay:
-    try:
-        data = read_json_object(STATE_PATH, required=False)
-        usage = data.get("usage")
-        if isinstance(usage, dict):
-            return normalize_usage_dict(usage)
-    except Exception:
-        pass
-    return dict(DEFAULT_USAGE)
-
-
-def normalize_usage_dict(raw: dict[str, Any]) -> codex_usage.UsageDisplay:
-    return {
-        "plan_type": raw.get("plan_type"),
-        "five_hour_percent": raw.get("five_hour_percent"),
-        "week_percent": raw.get("week_percent"),
-        "five_hour_reset": raw.get("five_hour_reset"),
-        "week_reset": raw.get("week_reset"),
-        "updated_at": raw.get("updated_at"),
-        "error": raw.get("error"),
-    }
-
-
-def save_snapshot(snapshot: SnapshotPayload) -> None:
-    tmp_path = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as handle:
-        json.dump(snapshot, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-    tmp_path.replace(STATE_PATH)
-
-
 async def build_snapshot(event: str) -> SnapshotPayload:
     if event not in VALID_EVENTS:
         raise ValueError(f"Unsupported event: {event}")
 
-    usage = load_cached_usage()
+    usage: codex_usage.UsageDisplay = dict(DEFAULT_USAGE)
     if event == "Stop":
         try:
             usage = await codex_usage.collect_usage_async()
@@ -163,7 +131,6 @@ class EspSocketClient:
 async def run_hook_event(event: str, config: ClientConfig) -> int:
     snapshot = await build_snapshot(event)
     await EspSocketClient(config.esp_host, config.esp_port).post_snapshot(snapshot)
-    save_snapshot(snapshot)
     return 0
 
 

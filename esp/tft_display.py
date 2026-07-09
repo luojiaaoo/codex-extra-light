@@ -14,30 +14,11 @@ class TFT:
         self.driver = config.TFT_DRIVER
         self.rotation = config.TFT_ROTATION
         self.mirror_x = getattr(config, "TFT_MIRROR_X", False)
-        self.spi = SPI(
-            1,
-            baudrate=26000000,
-            polarity=0,
-            phase=0,
-            sck=Pin(config.PIN_SCK),
-            mosi=Pin(config.PIN_MOSI),
-        )
+        self.spi = SPI(1, baudrate=26000000, polarity=0, phase=0)
         self.cs = Pin(config.PIN_CS, Pin.OUT, value=1)
         self.dc = Pin(config.PIN_DC, Pin.OUT, value=0)
         self.rst = Pin(config.PIN_RST, Pin.OUT, value=1)
-        self.init()
-
-    def init(self):
-        self.reset()
         self.init_ili9341()
-
-    def reset(self):
-        self.rst(1)
-        time.sleep_ms(50)
-        self.rst(0)
-        time.sleep_ms(50)
-        self.rst(1)
-        time.sleep_ms(150)
 
     def command(self, command, data=None):
         self.cs(0)
