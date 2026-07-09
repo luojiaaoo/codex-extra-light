@@ -1,4 +1,5 @@
 import gc
+import time
 
 import config
 from tft_display import TFT
@@ -99,6 +100,8 @@ class CodexScreen:
             "plan_type": None,
             "five_hour_percent": None,
             "week_percent": None,
+            "five_hour_reset": None,
+            "week_reset": None,
             "updated_at": None,
             "error": "waiting for PC client",
         }
@@ -110,6 +113,8 @@ class CodexScreen:
             "plan_type": None,
             "five_hour_percent": None,
             "week_percent": None,
+            "five_hour_reset": None,
+            "week_reset": None,
             "updated_at": None,
             "error": message,
         }
@@ -130,27 +135,67 @@ class CodexScreen:
             text = "IP " + self.ip_address + ":" + str(config.LISTEN_PORT)
         else:
             text = "IP connecting"
-        self.tft.text(text[:29], 8, 184, config.TEXT, config.BACKGROUND, 1)
+        self.tft.text(text[:29], 8, 188, config.TEXT, config.BACKGROUND, 1)
 
     def draw_usage(self):
-        self.tft.fill_rect(0, 0, config.TFT_WIDTH, 198, config.BACKGROUND)
-        self.tft.text("CODEX", 8, 10, config.TEXT, config.BACKGROUND, 3)
-        if self.usage.get("error"):
-            self.tft.text("usage error", 8, 52, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
-            self.tft.text(str(self.usage.get("error"))[:25], 8, 78, config.TEXT, config.BACKGROUND, 1)
+        self.tft.fill_rect(0, 0, config.TFT_WIDTH, 232, config.BACKGROUND)
+        self.tft.text("CODEX", 8, 8, config.TEXT, config.BACKGROUND, 2)
+        error = self.usage.get("error")
+        if error:
+            error_text = str(error)
+            self.tft.text("usage error", 8, 42, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
+            self.tft.text(error_text[:28], 8, 70, config.TEXT, config.BACKGROUND, 1)
+            self.tft.text(error_text[28:56], 8, 88, config.TEXT, config.BACKGROUND, 1)
             self.draw_ip()
             return
 
         plan = self.usage.get("plan_type") or "unknown"
         five = self.percent_text(self.usage.get("five_hour_percent"))
         week = self.percent_text(self.usage.get("week_percent"))
+        five_reset = self.short_time(self.usage.get("five_hour_reset"))
+        week_reset = self.short_time(self.usage.get("week_reset"))
         updated = self.short_time(self.usage.get("updated_at"))
 
-        self.tft.text("PLAN " + str(plan)[:12], 8, 52, config.TEXT, config.BACKGROUND, 2)
-        self.tft.text("5H   " + five, 8, 84, config.TEXT, config.BACKGROUND, 3)
-        self.tft.text("WEEK " + week, 8, 122, config.TEXT, config.BACKGROUND, 3)
-        self.tft.text("UPD " + updated, 8, 166, config.TEXT, config.BACKGROUND, 1)
+        self.tft.text("PLAN " + str(plan)[:20], 8, 34, config.TEXT, config.BACKGROUND, 1)
+        self.tft.text("5H " + five, 8, 56, config.TEXT, config.BACKGROUND, 2)
+        self.draw_progress_bar(8, 78, self.usage.get("five_hour_percent"))
+        self.tft.text("RST " + five_reset, 8, 94, config.TEXT, config.BACKGROUND, 1)
+        self.tft.text("WK " + week, 8, 114, config.TEXT, config.BACKGROUND, 2)
+        self.draw_progress_bar(8, 136, self.usage.get("week_percent"))
+        self.tft.text("RST " + week_reset, 8, 152, config.TEXT, config.BACKGROUND, 1)
+        self.tft.text("UPD " + updated, 8, 168, config.TEXT, config.BACKGROUND, 1)
         self.draw_ip()
+
+    def draw_progress_bar(self, x, y, value):
+        width = config.TFT_WIDTH - x * 2
+        height = 10
+        track = 0x39E7
+        percent = self.percent_value(value)
+        if percent is None:
+            color = track
+        elif percent < 25:
+            color = config.BRIGHT_RED
+        elif percent < 50:
+            color = config.BRIGHT_YELLOW
+        else:
+            color = config.BRIGHT_GREEN
+        self.tft.fill_rect(x, y, width, height, track)
+        if percent is not None and percent > 0:
+            fill_width = int(width * percent / 100)
+            if fill_width <= 0:
+                fill_width = 1
+            self.tft.fill_rect(x, y, fill_width, height, color)
+
+    def percent_value(self, value):
+        try:
+            percent = int(value)
+        except (TypeError, ValueError):
+            return None
+        if percent < 0:
+            return 0
+        if percent > 100:
+            return 100
+        return percent
 
     def percent_text(self, value):
         if value is None:
@@ -160,12 +205,36 @@ class CodexScreen:
     def short_time(self, value):
         if not value:
             return "n/a"
-        if "T" in value:
-            return value.split("T", 1)[1][:5]
-        return str(value)[:16]
+        if isinstance(value, int) or isinstance(value, float):
+            try:
+                tm = time.localtime(int(value))
+                return "%02d/%02d %02d:%02d" % (tm[1], tm[2], tm[3], tm[4])
+            except Exception:
+                return str(value)[:16]
+        text = str(value)
+        if "T" in text:
+            date, clock = text.split("T", 1)
+            date = date[5:10] if len(date) >= 10 else date
+            return date + " " + clock[:5]
+        return text[:16]
+
+    def merge_usage(self, usage):
+        merged = dict(self.usage)
+        for key in (
+            "plan_type",
+            "five_hour_percent",
+            "week_percent",
+            "five_hour_reset",
+            "week_reset",
+            "updated_at",
+            "error",
+        ):
+            if key in usage:
+                merged[key] = usage.get(key)
+        self.usage = merged
 
     def draw_status(self):
-        top = 200
+        top = 234
         height = config.TFT_HEIGHT - top
         width = config.TFT_WIDTH
 
@@ -180,7 +249,7 @@ class CodexScreen:
             label = "IDLE"
 
         self.tft.fill_rect(0, top, width, height, color)
-        self.tft.text(label, 8, top + 48, config.TEXT, None, 2)
+        self.tft.text(label, 8, top + 24, config.TEXT, None, 2)
 
     async def blink_loop(self):
         import uasyncio as asyncio
@@ -202,7 +271,7 @@ class CodexScreen:
             self.state = state
         usage = snapshot.get("usage")
         if isinstance(usage, dict):
-            self.usage = usage
+            self.merge_usage(usage)
         if self.state != STATE_WORKING:
             self.blink_on = False
         self.draw_usage()
