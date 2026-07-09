@@ -160,7 +160,12 @@ async def dns_loop(ip_address):
 async def send_page(writer, message=""):
     writer.write(b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n")
     writer.write(b"<html><head><meta name=viewport content='width=device-width,initial-scale=1'>")
-    writer.write(b"<title>WiFi Setup</title></head><body><h2>Codex ESP WiFi</h2>")
+    writer.write(b"<title>WiFi Setup</title><style>")
+    writer.write(b"body{background:#101418;color:#f4f7fb;font-family:Arial;margin:20px}")
+    writer.write(b"select,input,button{width:100%;box-sizing:border-box;padding:10px;margin:6px 0 12px;background:#111;color:#fff;border:1px solid #56616f}")
+    writer.write(b"button{background:#ffd84d;color:#111;font-weight:bold}")
+    writer.write(b"option{background:#111;color:#fff}")
+    writer.write(b"</style></head><body><h2>Codex ESP WiFi</h2>")
     if message:
         writer.write(("<p><b>" + message + "</b></p>").encode())
     writer.write(b"<form method=get action=/refresh><button>Refresh WiFi list</button></form>")

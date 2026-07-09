@@ -74,7 +74,7 @@ class SetupScreen:
             self.draw_countdown()
         else:
             self.tft.text("CONNECTING WIFI", 8, 96, config.TEXT, config.BACKGROUND, 2)
-        self.tft.fill_rect(0, 250, config.TFT_WIDTH, config.TFT_HEIGHT - 250, config.BRIGHT_YELLOW)
+        self.tft.fill_rect(0, 250, config.TFT_WIDTH, config.TFT_HEIGHT - 250, config.DIM_RED)
         self.tft.text("SETUP MODE", 8, 282, config.TEXT, None, 2)
 
     def draw_countdown(self):
