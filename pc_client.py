@@ -156,68 +156,92 @@ class DesktopApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("Codex ESP")
-        self.root.geometry("400x360")
-        self.root.resizable(False, True)
-        self.root.minsize(320, 280)
+        self.root.geometry("440x46")
+        self.root.resizable(False, False)
 
         self.config = load_config()
         self.polling = False
         self.worker_running = False
         self.stop_event = threading.Event()
+        self.console_win = None
 
-        self.switch_text = tk.StringVar(value="Start")
+        self.switch_text = tk.StringVar(value="▶ Start")
         self.endpoint_text = tk.StringVar(value=self.config.esp_endpoint)
 
         self.build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def build_ui(self) -> None:
-        frame = ttk.Frame(self.root, padding=16)
-        frame.pack(fill="both", expand=True)
+        row = ttk.Frame(self.root, padding=(12, 8))
+        row.pack(fill="both", expand=True)
 
-        toolbar = ttk.Frame(frame)
-        toolbar.pack(fill="x")
-
-        ttk.Label(toolbar, textvariable=self.endpoint_text).pack(side="left")
-        ttk.Button(toolbar, text="⚙", width=3, command=self.open_config).pack(side="right")
-
-        self.btn = tk.Button(
-            frame,
-            textvariable=self.switch_text,
-            command=self.toggle_polling,
-            font=("Segoe UI", 14, "bold"),
-            bg="#4CAF50", fg="white",
-            activebackground="#45a049", activeforeground="white",
-            relief="flat", bd=0,
-            cursor="hand2",
-        )
-        self.btn.pack(fill="x", pady=(20, 0), ipady=14)
+        ttk.Label(row, textvariable=self.endpoint_text, foreground="#888", font=("Segoe UI", 9)).pack(side="left")
 
         period = self.config.poll_minutes
-        label = f"every {period} min" if period == 1 else f"every {period} mins"
-        self.period_label = ttk.Label(frame, text=label, foreground="#888", font=("Segoe UI", 9))
-        self.period_label.pack(anchor="w", pady=(4, 10))
+        label = f"· {period}m"
+        self.period_label = ttk.Label(row, text=label, foreground="#888", font=("Segoe UI", 9))
+        self.period_label.pack(side="left", padx=(6, 0))
 
-        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 6))
+        ttk.Button(row, text="Console", width=7, command=self.open_console).pack(side="right", padx=(4, 0))
+        ttk.Button(row, text="⚙", width=3, command=self.open_config).pack(side="right")
 
-        log_frame = ttk.Frame(frame)
+        self.btn = tk.Button(
+            row,
+            textvariable=self.switch_text,
+            command=self.toggle_polling,
+            font=("Segoe UI", 9, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            activebackground="#45a049",
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            cursor="hand2",
+        )
+        self.btn.pack(side="right", padx=(0, 8))
+
+        self._create_console()
+
+    def _create_console(self) -> None:
+        win = tk.Toplevel(self.root)
+        win.title("Console")
+        win.geometry("500x360")
+        win.protocol("WM_DELETE_WINDOW", win.withdraw)
+        win.withdraw()
+
+        log_frame = ttk.Frame(win, padding=8)
         log_frame.pack(fill="both", expand=True)
-        self.log_area = tk.Text(log_frame, height=8, bg="#1e1e1e", fg="#d4d4d4",
-                                insertbackground="#d4d4d4", relief="flat", borderwidth=0,
-                                font=("Consolas", 9), wrap="word", state="disabled")
+        self.log_area = tk.Text(
+            log_frame,
+            bg="#1e1e1e",
+            fg="#d4d4d4",
+            insertbackground="#d4d4d4",
+            relief="flat",
+            borderwidth=0,
+            font=("Consolas", 9),
+            wrap="word",
+            state="disabled",
+        )
         scrollbar = ttk.Scrollbar(log_frame, command=self.log_area.yview)
         self.log_area.configure(yscrollcommand=scrollbar.set)
         self.log_area.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
+        self.console_win = win
+
+    def open_console(self) -> None:
+        self.console_win.deiconify()
+        self.console_win.lift()
+
     def toggle_polling(self) -> None:
         self.polling = not self.polling
         self.stop_event.clear()
         if self.polling:
-            self.switch_text.set("Stop")
+            self.switch_text.set("■ Stop")
             self.btn.configure(bg="#f44336", activebackground="#d32f2f")
         else:
-            self.switch_text.set("Start")
+            self.switch_text.set("▶ Start")
             self.btn.configure(bg="#4CAF50", activebackground="#45a049")
         if self.polling and not self.worker_running:
             threading.Thread(target=self.poll_loop, daemon=True).start()
@@ -282,9 +306,12 @@ class DesktopApp:
         return f"{plan} | 5h {five} | week {week} | {updated}"
 
     def open_config(self) -> None:
+        style = ttk.Style()
+        style.configure("Dialog.TButton", padding=(0, 8))
+
         dialog = tk.Toplevel(self.root)
         dialog.title("Settings")
-        dialog.geometry("280x200")
+        dialog.geometry("320x220")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -330,12 +357,12 @@ class DesktopApp:
             self.config = ClientConfig(host, port, poll)
             save_config(self.config)
             self.endpoint_text.set(self.config.esp_endpoint)
-            label = f"every {poll} min" if poll == 1 else f"every {poll} mins"
+            label = f"· {poll}m"
             self.period_label.configure(text=label)
             dialog.destroy()
 
-        ttk.Button(buttons, text="Cancel", command=dialog.destroy).pack(side="right")
-        ttk.Button(buttons, text="Save", command=save).pack(side="right", padx=(0, 8))
+        tk.Button(buttons, text="保存", width=3, command=save).pack(side="left")
+        tk.Button(buttons, text="取消", width=3, command=dialog.destroy).pack(side="left", padx=(8, 0))
 
     def on_close(self) -> None:
         self.polling = False
@@ -380,11 +407,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if len(parsed.args) == 1 and parsed.args[0] in VALID_EVENTS:
         parsed.mode = "hook"
         parsed.event = parsed.args[0]
-        return parsed
-
-    if len(parsed.args) == 2 and parsed.args[0] == "hook" and parsed.args[1] in VALID_EVENTS:
-        parsed.mode = "hook"
-        parsed.event = parsed.args[1]
         return parsed
 
     parser.error("use no args for desktop mode, or pass one event: " + ", ".join(sorted(VALID_EVENTS)))

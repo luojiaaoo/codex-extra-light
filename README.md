@@ -23,7 +23,7 @@ python .\pc_client.py daemon
 Codex hooks 会调用异步 hook 通知命令：
 
 ```powershell
-python .\pc_client.py hook <EventName>
+python .\pc_client.py <EventName>
 ```
 
 如果守护进程没有运行，hook 命令会快速退出，不会拖慢 Codex。
@@ -33,7 +33,7 @@ python .\pc_client.py hook <EventName>
 用量刷新规则：
 
 - 守护进程启动时主动刷新一次。
-- 收到 `Stop` hook 时主动刷新一次。
+- 收到 `Stop`时主动刷新一次。
 - 周期任务每 60 秒检查一次；只有最近 60 秒内没有主动刷新请求时，才会触发周期刷新。
 
 ## Codex hooks 配置
