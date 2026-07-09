@@ -5,7 +5,7 @@ import sys
 import threading
 import tkinter as tk
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Any, Literal, NotRequired, TypedDict
@@ -15,8 +15,6 @@ import codex_usage
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "pc_client_config.json"
-CONFIG_EXAMPLE_PATH = ROOT / "pc_client_config.example.json"
-POLL_SECONDS = 30
 
 State = Literal["working", "waiting", "idle"]
 
@@ -41,20 +39,26 @@ class SnapshotPayload(TypedDict):
 class ClientConfig:
     esp_host: str = "192.168.1.50"
     esp_port: int = 8765
+    poll_minutes: int = 1
 
     @property
     def esp_endpoint(self) -> str:
         return f"{self.esp_host}:{self.esp_port}"
 
+    @property
+    def poll_seconds(self) -> int:
+        return max(1, self.poll_minutes) * 60
+
+
+TZ_CST = timezone(timedelta(hours=8))
+
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(TZ_CST).isoformat(timespec="seconds")
 
 
 def load_config() -> ClientConfig:
-    raw: dict[str, Any] = {}
-    raw.update(read_json_object(CONFIG_EXAMPLE_PATH, required=False))
-    raw.update(read_json_object(CONFIG_PATH, required=CONFIG_PATH.exists()))
+    raw = read_json_object(CONFIG_PATH, required=CONFIG_PATH.exists())
     return coerce_config(raw)
 
 
@@ -62,6 +66,7 @@ def save_config(config: ClientConfig) -> None:
     data = {
         "esp_host": config.esp_host,
         "esp_port": config.esp_port,
+        "poll_minutes": config.poll_minutes,
     }
     with open(CONFIG_PATH, "w", encoding="utf-8") as handle:
         json.dump(data, handle, ensure_ascii=False, indent=2)
@@ -85,6 +90,7 @@ def coerce_config(raw: dict[str, Any]) -> ClientConfig:
     return ClientConfig(
         esp_host=str(raw.get("esp_host", defaults.esp_host)).strip() or defaults.esp_host,
         esp_port=int(raw.get("esp_port", defaults.esp_port)),
+        poll_minutes=int(raw.get("poll_minutes", defaults.poll_minutes)),
     )
 
 
@@ -150,8 +156,9 @@ class DesktopApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("Codex ESP")
-        self.root.geometry("320x180")
-        self.root.resizable(False, False)
+        self.root.geometry("400x360")
+        self.root.resizable(False, True)
+        self.root.minsize(320, 280)
 
         self.config = load_config()
         self.polling = False
@@ -160,8 +167,6 @@ class DesktopApp:
 
         self.switch_text = tk.StringVar(value="Start")
         self.endpoint_text = tk.StringVar(value=self.config.esp_endpoint)
-        self.status_text = tk.StringVar(value="Stopped")
-        self.detail_text = tk.StringVar(value="ESP " + self.config.esp_endpoint)
 
         self.build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -176,53 +181,87 @@ class DesktopApp:
         ttk.Label(toolbar, textvariable=self.endpoint_text).pack(side="left")
         ttk.Button(toolbar, text="⚙", width=3, command=self.open_config).pack(side="right")
 
-        ttk.Button(
+        self.btn = tk.Button(
             frame,
             textvariable=self.switch_text,
             command=self.toggle_polling,
-        ).pack(fill="x", pady=(20, 12), ipady=18)
+            font=("Segoe UI", 14, "bold"),
+            bg="#4CAF50", fg="white",
+            activebackground="#45a049", activeforeground="white",
+            relief="flat", bd=0,
+            cursor="hand2",
+        )
+        self.btn.pack(fill="x", pady=(20, 0), ipady=14)
 
-        ttk.Label(frame, textvariable=self.status_text).pack(anchor="w")
-        ttk.Label(frame, textvariable=self.detail_text, foreground="#555").pack(anchor="w", pady=(6, 0))
+        period = self.config.poll_minutes
+        label = f"every {period} min" if period == 1 else f"every {period} mins"
+        self.period_label = ttk.Label(frame, text=label, foreground="#888", font=("Segoe UI", 9))
+        self.period_label.pack(anchor="w", pady=(4, 10))
+
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        log_frame = ttk.Frame(frame)
+        log_frame.pack(fill="both", expand=True)
+        self.log_area = tk.Text(log_frame, height=8, bg="#1e1e1e", fg="#d4d4d4",
+                                insertbackground="#d4d4d4", relief="flat", borderwidth=0,
+                                font=("Consolas", 9), wrap="word", state="disabled")
+        scrollbar = ttk.Scrollbar(log_frame, command=self.log_area.yview)
+        self.log_area.configure(yscrollcommand=scrollbar.set)
+        self.log_area.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
     def toggle_polling(self) -> None:
         self.polling = not self.polling
         self.stop_event.clear()
-        self.switch_text.set("Stop" if self.polling else "Start")
-        self.status_text.set("Polling every 30 seconds" if self.polling else "Stopped")
+        if self.polling:
+            self.switch_text.set("Stop")
+            self.btn.configure(bg="#f44336", activebackground="#d32f2f")
+        else:
+            self.switch_text.set("Start")
+            self.btn.configure(bg="#4CAF50", activebackground="#45a049")
         if self.polling and not self.worker_running:
             threading.Thread(target=self.poll_loop, daemon=True).start()
 
     def poll_loop(self) -> None:
         self.worker_running = True
+        self.log("--- Polling started ---")
         try:
             while self.polling and not self.stop_event.is_set():
-                self.set_status("Fetching Codex usage...")
+                self.log("Fetching Codex usage…")
                 try:
                     snapshot = asyncio.run(build_usage_snapshot())
+                    self.log(f"Sending: {json.dumps(snapshot, ensure_ascii=False)}")
                     asyncio.run(send_snapshot(snapshot, self.config))
                     usage = snapshot.get("usage", {})
                     if usage.get("error"):
-                        self.set_status("Usage error")
-                        self.set_detail(str(usage.get("error"))[:80])
+                        self.log(f"Usage error: {usage['error']}")
                     else:
-                        self.set_status("Sent to ESP")
-                        self.set_detail(self.format_usage(usage))
+                        self.log(f"Sent OK → {self.format_usage(usage)}")
                 except Exception as exc:
-                    self.set_status("Send failed")
-                    self.set_detail(str(exc)[:80])
+                    self.log(f"Send failed: {exc}")
 
-                for _ in range(POLL_SECONDS):
+                seconds = self.config.poll_seconds
+                for _ in range(seconds):
                     if not self.polling or self.stop_event.wait(1):
                         return
         finally:
+            self.log("--- Polling stopped ---")
             self.worker_running = False
 
-    def set_status(self, value: str) -> None:
-        self.root.after(0, self.status_text.set, value)
+    def log(self, message: str) -> None:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        line = f"[{timestamp}] {message}\n"
 
-    def set_detail(self, value: str) -> None:
-        self.root.after(0, self.detail_text.set, value)
+        def append():
+            self.log_area.configure(state="normal")
+            self.log_area.insert("end", line)
+            # Keep last 300 lines
+            if int(self.log_area.index("end-1c").split(".")[0]) > 300:
+                self.log_area.delete("1.0", "2.0")
+            self.log_area.see("end")
+            self.log_area.configure(state="disabled")
+
+        self.root.after(0, append)
 
     def format_usage(self, usage: dict[str, Any]) -> str:
         plan = usage.get("plan_type") or "unknown"
@@ -233,21 +272,24 @@ class DesktopApp:
 
     def open_config(self) -> None:
         dialog = tk.Toplevel(self.root)
-        dialog.title("ESP Config")
-        dialog.geometry("280x150")
+        dialog.title("Settings")
+        dialog.geometry("280x200")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
 
         host_var = tk.StringVar(value=self.config.esp_host)
         port_var = tk.StringVar(value=str(self.config.esp_port))
+        poll_var = tk.StringVar(value=str(self.config.poll_minutes))
 
         frame = ttk.Frame(dialog, padding=14)
         frame.pack(fill="both", expand=True)
         ttk.Label(frame, text="ESP IP").pack(anchor="w")
         ttk.Entry(frame, textvariable=host_var).pack(fill="x", pady=(2, 8))
         ttk.Label(frame, text="Port").pack(anchor="w")
-        ttk.Entry(frame, textvariable=port_var).pack(fill="x", pady=(2, 12))
+        ttk.Entry(frame, textvariable=port_var).pack(fill="x", pady=(2, 8))
+        ttk.Label(frame, text="Poll (min)").pack(anchor="w")
+        ttk.Entry(frame, textvariable=poll_var).pack(fill="x", pady=(2, 12))
 
         buttons = ttk.Frame(frame)
         buttons.pack(fill="x")
@@ -257,19 +299,28 @@ class DesktopApp:
             try:
                 port = int(port_var.get().strip())
             except ValueError:
-                messagebox.showerror("Invalid port", "Port must be a number.", parent=dialog)
+                messagebox.showerror("Invalid", "Port must be a number.", parent=dialog)
+                return
+            try:
+                poll = int(poll_var.get().strip())
+            except ValueError:
+                messagebox.showerror("Invalid", "Poll must be a number.", parent=dialog)
                 return
             if not host:
-                messagebox.showerror("Invalid IP", "ESP IP is required.", parent=dialog)
+                messagebox.showerror("Invalid", "ESP IP is required.", parent=dialog)
                 return
             if not (1 <= port <= 65535):
-                messagebox.showerror("Invalid port", "Port must be 1-65535.", parent=dialog)
+                messagebox.showerror("Invalid", "Port must be 1-65535.", parent=dialog)
+                return
+            if poll < 1:
+                messagebox.showerror("Invalid", "Poll must be >= 1 minute.", parent=dialog)
                 return
 
-            self.config = ClientConfig(host, port)
+            self.config = ClientConfig(host, port, poll)
             save_config(self.config)
             self.endpoint_text.set(self.config.esp_endpoint)
-            self.detail_text.set("ESP " + self.config.esp_endpoint)
+            label = f"every {poll} min" if poll == 1 else f"every {poll} mins"
+            self.period_label.configure(text=label)
             dialog.destroy()
 
         ttk.Button(buttons, text="Cancel", command=dialog.destroy).pack(side="right")

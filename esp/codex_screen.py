@@ -1,5 +1,4 @@
 import gc
-import time
 
 import config
 from tft_display import TFT
@@ -205,18 +204,7 @@ class CodexScreen:
     def short_time(self, value):
         if not value:
             return "n/a"
-        if isinstance(value, int) or isinstance(value, float):
-            try:
-                tm = time.localtime(int(value))
-                return "%02d/%02d %02d:%02d" % (tm[1], tm[2], tm[3], tm[4])
-            except Exception:
-                return str(value)[:16]
-        text = str(value)
-        if "T" in text:
-            date, clock = text.split("T", 1)
-            date = date[5:10] if len(date) >= 10 else date
-            return date + " " + clock[:5]
-        return text[:16]
+        return str(value)[:16]
 
     def merge_usage(self, usage):
         merged = dict(self.usage)

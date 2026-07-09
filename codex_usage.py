@@ -1,10 +1,13 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
 
 import httpx
+
+
+TZ_CST = timezone(timedelta(hours=8))
 
 
 CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
@@ -23,8 +26,8 @@ class UsageDisplay(TypedDict):
     plan_type: str | None
     five_hour_percent: int | None
     week_percent: int | None
-    five_hour_reset: int | float | None
-    week_reset: int | float | None
+    five_hour_reset: str | None
+    week_reset: str | None
     updated_at: str
     error: str | None
 
@@ -126,6 +129,10 @@ async def fetch_codex_usage_async(
     return response.json()
 
 
+def format_cst_time(ts: int | float) -> str:
+    return datetime.fromtimestamp(ts, TZ_CST).strftime("%m-%d %H:%M")
+
+
 def normalize_usage(raw_usage: JsonObject) -> UsageDisplay:
     """把接口原始字段转换成屏幕端稳定消费的显示字段。"""
     rate_limit = raw_usage.get("rate_limit", {})
@@ -135,13 +142,16 @@ def normalize_usage(raw_usage: JsonObject) -> UsageDisplay:
     five_hour_used = primary_window.get("used_percent")
     week_used = secondary_window.get("used_percent")
 
+    five_hour_reset = primary_window.get("reset_at")
+    week_reset = secondary_window.get("reset_at")
+
     return {
         "plan_type": raw_usage.get("plan_type"),
         "five_hour_percent": remaining_percent(five_hour_used),
         "week_percent": remaining_percent(week_used),
-        "five_hour_reset": primary_window.get("reset_at"),
-        "week_reset": secondary_window.get("reset_at"),
-        "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+        "five_hour_reset": format_cst_time(five_hour_reset) if five_hour_reset else None,
+        "week_reset": format_cst_time(week_reset) if week_reset else None,
+        "updated_at": datetime.now(TZ_CST).strftime("%m-%d %H:%M"),
         "error": None,
     }
 
@@ -207,6 +217,6 @@ def empty_usage_with_error(error: BaseException) -> UsageDisplay:
         "week_percent": None,
         "five_hour_reset": None,
         "week_reset": None,
-        "updated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+        "updated_at": datetime.now(TZ_CST).strftime("%m-%d %H:%M"),
         "error": str(error),
     }
