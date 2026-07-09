@@ -115,7 +115,6 @@ def stop_setup_ap():
 async def start_setup_portal(wlan, screen, message):
     print("Opening setup portal")
     if screen:
-        screen.show_opening_hotspot()
         screen.release_display()
     gc.collect()
     import wifi_setup

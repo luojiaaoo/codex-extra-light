@@ -45,15 +45,6 @@ class SetupScreen:
         self.setup_remaining = None
         self.draw_setup()
 
-    def show_opening_hotspot(self):
-        self.setup_mode = "opening_hotspot"
-        self.setup_ssid = None
-        self.setup_password = None
-        self.setup_ip = None
-        self.setup_message = "opening hotspot"
-        self.setup_remaining = None
-        self.draw_setup()
-
     def show_wifi_connecting(self, ssid, remaining=None):
         partial = self.setup_mode == "connecting" and self.setup_ssid == ssid
         self.setup_mode = "connecting"
@@ -84,9 +75,6 @@ class SetupScreen:
             self.tft.text(str(self.setup_ssid)[:25], 8, 112, config.TEXT, config.BACKGROUND, 1)
             self.tft.text("WIFI Connecting", 8, 150, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
             self.draw_countdown()
-        elif self.setup_mode == "opening_hotspot":
-            self.tft.text("OPENING HOTSPOT", 8, 96, config.BRIGHT_YELLOW, config.BACKGROUND, 2)
-            self.tft.text("PLEASE WAIT", 8, 134, config.TEXT, config.BACKGROUND, 2)
         else:
             self.tft.text("CONNECTING WIFI", 8, 96, config.TEXT, config.BACKGROUND, 2)
         self.tft.fill_rect(0, 250, config.TFT_WIDTH, config.TFT_HEIGHT - 250, config.DIM_RED)
