@@ -1,4 +1,4 @@
-# Codex ESP8266 状态屏
+# CodexExtraLight
 
 这个项目用 ESP8266 驱动 240x320 SPI TFT 屏幕，显示 Codex 当前状态和 Codex 用量。
 

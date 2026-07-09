@@ -53,6 +53,12 @@ class ClientConfig:
 TZ_CST = timezone(timedelta(hours=8))
 
 
+def _icon_path() -> str:
+    if getattr(sys, "frozen", False):
+        return str(Path(sys._MEIPASS) / "favicon.ico")
+    return str(Path(__file__).parent / "favicon.ico")
+
+
 def now_iso() -> str:
     return datetime.now(TZ_CST).isoformat(timespec="seconds")
 
@@ -155,9 +161,10 @@ async def run_hook_event(event: str, config: ClientConfig) -> int:
 class DesktopApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title("Codex ESP")
+        self.root.title("CodexExtraLight")
         self.root.geometry("440x46")
         self.root.resizable(False, False)
+        self.root.iconbitmap(_icon_path())
 
         self.config = load_config()
         self.polling = False
@@ -395,7 +402,7 @@ async def async_main(args: argparse.Namespace) -> int:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Codex ESP8266 status screen client.")
+    parser = argparse.ArgumentParser(description="CodexExtraLight")
     parser.add_argument("args", nargs="*", help="Optional hook event name.")
     parsed = parser.parse_args(argv)
 
