@@ -92,6 +92,8 @@ GUI 窗口点 ▶ Start 开始轮询，点 ⚙ 设置 ESP 的 IP 地址和轮询
 
 编辑 `C:\Users\<你的用户名>\.codex\hooks.json`，添加以下配置：
 
+#### Python版本
+
 ```json
 {
   "hooks": {
@@ -115,6 +117,70 @@ GUI 窗口点 ▶ Start 开始轮询，点 ⚙ 设置 ESP 的 IP 地址和轮询
 ```
 
 > `<项目路径>` 换成你的实际路径，比如 `D:/我的开源/codex-extra-light`。
+
+#### exe版本
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start \"C:/sys_soft/CodexExtraLight.exe\" UserPromptSubmit",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start \"C:/sys_soft/CodexExtraLight.exe\" PreToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start \"C:/sys_soft/CodexExtraLight.exe\" PostToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start \"C:/sys_soft/CodexExtraLight.exe\" PermissionRequest",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "start \"C:/sys_soft/CodexExtraLight.exe\" Stop",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ### 事件说明
 
